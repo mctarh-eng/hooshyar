@@ -1,0 +1,34 @@
+{
+  "name": "هوش‌یار | همه هوش مصنوعی‌ها در یک جا",
+  "short_name": "هوش‌یار",
+  "description": "دستیار هوشمند فارسی برای گفتگو با هوش مصنوعی‌های ایرانی و بین‌المللی، ساخت تصویر و شنیدن پاسخ‌ها.",
+  "lang": "fa",
+  "dir": "rtl",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#fff8ec",
+  "theme_color": "#f59e0b",
+  "categories": ["productivity", "utilities", "education"],
+  "icons": [
+    {
+      "src": "/icons/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ]
+}

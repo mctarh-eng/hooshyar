@@ -1,0 +1,107 @@
+# Worklog - Hooshyar (هوش‌یار) AI Hub App
+
+Project: Unified Persian AI hub (Next.js 16, App Router, RTL, PWA-ready, single-page at `/`).
+
+---
+
+Task ID: 1
+Agent: main (Z.ai Code)
+Task: Build the foundation: Persian font, RTL cheerful theme, database schema, PWA files, app icon, providers data, zustand store, hooks, query provider.
+
+Work Log:
+- Read project files (package.json, layout, globals.css, prisma schema) and confirmed deps: zustand, framer-motion, react-markdown, @tanstack/react-query, sharp, sonner, next-themes all preinstalled.
+- Tested z-ai-web-dev-sdk capabilities with temp scripts:
+  - `zai.chat.completions.create({stream:true})` WORKS: async iterable of Uint8Array chunks containing raw SSE text lines `data: {json}`; delta text at `json.choices[0].delta.content`.
+  - TTS `zai.audio.tts.create({input, voice:'tongtong', response_format:'wav', stream:false})` WORKS with Persian text (returned 143KB wav).
+  - Image gen CLI works.
+- Downloaded Vazirmatn variable woff2 -> `src/fonts/Vazirmatn-Variable.woff2` (112KB).
+- Generated app icon via z-ai CLI -> `public/icons/icon-1024.png`, resized with sharp to 512/192.
+- Prisma schema: Conversation, Message (cascade delete), GeneratedImage; pushed to SQLite.
+- `src/lib/providers.ts`: 10 AI providers (5 Iranian: hooshyar/aio/dorna/hoosha/maral + 5 global: chatgpt/claude/gemini/deepseek/grok) with id, name, emoji, gradient, tagline, specialties, persona (used in system prompt).
+- `src/lib/store.ts`: zustand persisted store (view, activeConversationId, providerId, draftMessage, simulatedOffline, fontScale).
+- `src/lib/offline-queue.ts`: localStorage-backed offline message queue (getQueue/enqueue/dequeue).
+- `src/lib/types.ts`: ConversationSummary, ChatMessageData, ConversationDetail, ImageRecord.
+- `src/lib/utils.ts`: added timeAgo/faTime/faDate/greetingByHour (fa-IR Intl).
+- `src/hooks/use-online.ts`: useOnline + useIsConnected (respects simulatedOffline).
+- `src/hooks/use-conversations.ts`: TanStack Query hooks: useConversationList, useConversationDetail, useDeleteConversation, useRenameConversation, useImageList, useDeleteImage, useClearConversations. Keys: ['conversations'], ['conversations', id], ['images'].
+- `src/components/query-provider.tsx`, `src/components/sw-register.tsx` (SW only in production).
+- `src/app/layout.tsx`: lang=fa dir=rtl, Vazirmatn local font (--font-vazir), ThemeProvider, QueryProvider, sonner Toaster, PWA metadata + viewport (themeColor #f59e0b, viewportFit cover).
+- `src/app/globals.css`: warm cheerful light + dark theme (no blue/indigo), utilities: gradient-hero, text-gradient-warm, no-scrollbar, nice-scrollbar, typing-dot, soft-float, .md-answer markdown styles (RTL-aware), font-scale-sm/md/lg (sets --app-font-size on html).
+- `public/manifest.json` (fa, rtl, standalone) + `public/sw.js` (precache shell, network-first navigation, cache-first static, never caches /api).
+
+Stage Summary:
+- Foundation complete. Next agents MUST reuse: getProvider(id) from lib/providers, useUIStore from lib/store, hooks from use-conversations, cn/timeAgo/faDate/greetingByHour from lib/utils, useIsConnected from use-online.
+- API contract (being built in 2-b): POST /api/chat {conversationId?, content, providerId} -> SSE stream (lines `data: {...}` with {meta:{conversationId,providerId}} first, then {delta:"..."} chunks, then {done:true,title?,conversationId}); GET /api/conversations; GET/PATCH/DELETE /api/conversations/[id]; DELETE /api/conversations (clear all); POST/GET /api/image; GET/DELETE /api/image/[id] (GET returns image bytes); POST /api/tts {text} -> audio/wav bytes.
+
+---
+
+Task ID: 2-a
+Agent: frontend-styling-expert
+Task: Build shell UI components (header, bottom nav, offline banner, home view, history view, settings view)
+
+Work Log:
+- Read worklog (Task 1) and reused foundation EXACTLY: useUIStore (lib/store), PROVIDERS/getProvider (lib/providers), useIsConnected/useOnline (hooks/use-online), conversation hooks (hooks/use-conversations), cn/timeAgo/faDate/greetingByHour (lib/utils), types (lib/types), utilities from globals.css (gradient-hero, soft-float, no-scrollbar, font-scale-*).
+- Created `src/components/app-header.tsx`: sticky top-0 z-40 header, backdrop-blur bg-background/80 border-b, max-w-3xl; logo (next/image /icons/icon-192.png 36px rounded-xl) + «هوش‌یار» + subtitle (hidden below sm); end side: connection Badge «آنلاین» (emerald ping dot) / «آفلاین» (rose + WifiOff), gear IconButton -> setView('settings') aria-label «تنظیمات», theme toggle (next-themes, sun/moon) with hydration-safe mounted guard.
+- Created `src/components/bottom-nav.tsx`: fixed bottom-0 inset-x-0 z-40, max-w-3xl, bg-background/85 backdrop-blur border-t, safe-area paddingBottom max(0.5rem, env(safe-area-inset-bottom)); 4 tabs (خانه/گفتگو/تصویر/تاریخچه) with motion layoutId="nav-pill" gradient pill (from-primary/15 to-accent), Persian aria-labels, setView on click.
+- Created `src/components/offline-banner.tsx`: AnimatePresence height-animated banner when !useIsConnected(); amber-400→orange-400 gradient, dark amber-950 text, WifiOff + «آفلاین هستی! پیام‌هات ذخیره می‌شن و به‌محض اتصال ارسال می‌شن», session-dismiss «بستن» X button (local state).
+- Created `src/components/home-view.tsx`: (1) gradient-hero rounded-3xl hero with soft-float greeting emoji, greetingByHour text, faDate subtitle, one-liner, 2 white/20 backdrop CTAs («شروع گفتگو» startNewChat, «ساخت تصویر» setView('image')); (2) snap horizontal no-scrollbar capability row (گفتگوی هوشمند 💬 / تصویرسازی 🎨 / گفتار صوتی 🔊 / به‌زودی: جستجوی وب 🔍 with Badge + opacity-60); (3) shadcn Tabs «همه/ایرانی 🇮🇷/بین‌المللی 🌍» + grid-cols-2 sm:grid-cols-3 provider cards (gradient emoji avatar h-12 w-12, name, ltr latinName, tagline line-clamp-2, 2 specialty chips, motion whileHover y:-3) -> setProviderId + startNewChat + toast.success(`با «name» شروع کردی!`); (4) 6 suggestion cards -> askSuggestion; footer «ساخته شده با ❤️ برای کاربران فارسی‌زبان».
+- Created `src/components/history-view.tsx`: title + fa-IR count Badge; rounded-full search Input (Search icon at start) filtering title+lastMessage; useConversationList with 4 Skeletons loading; empty/error cute state (🗂️ / 🔍 + «شروع اولین گفتگو» button); rows: gradient provider avatar, title/lastMessage line-clamp-1, timeAgo(updatedAt), ChevronLeft, row click -> openConversation(id), DropdownMenu (MoreVertical, stopPropagation) with «تغییر نام» (Dialog + Input + useRenameConversation + toast «نام عوض شد ✅») and destructive «حذف» (AlertDialog + useDeleteConversation + toast «حذف شد 🗑️»).
+- Created `src/components/settings-view.tsx`: card sections (rounded-2xl border bg-card p-6): a) «ظاهر» theme segmented control (روشن ☀️/تاریخی 🌙/سیستم 💻, motion layoutId="theme-pill", next-themes setTheme) + font-size segmented (کوچک/متوسط/بزرگ -> setFontScale, layoutId="font-pill", useEffect applies font-scale-sm/md/lg to documentElement); b) «اتصال» real device status (useOnline) + app status (useIsConnected) Badges + Switch «شبیه‌سازی قطع اینترنت» -> setSimulatedOffline with toast.info; c) «نصب برنامه» beforeinstallprompt capture in useEffect + prompt()/userChoice, disabled fallback hint; d) «داده‌ها» local-storage info row + destructive «پاک کردن همه گفتگوها» AlertDialog -> useClearConversations; e) «درباره هوش‌یار» icon 56px, «نسخه ۱٫۰٫۰» Badge, description, «آماده بازار»/«آماده مایکت» Badges. Back button (ArrowRight) -> setView('home').
+- Hydration safety: time-dependent hero (greeting/faDate) and theme/mounted guards use a useSyncExternalStore-based useMounted() (server=false → client=true) instead of setState-in-effect, satisfying the new react-hooks/set-state-in-effect lint rule.
+- Verified with `bun run lint` (clean exit, 0 problems) and `bunx tsc --noEmit` (no errors in src/; only pre-existing errors in examples/ + skills/).
+
+Stage Summary:
+- Created exactly 6 files: src/components/{app-header,bottom-nav,offline-banner,home-view,history-view,settings-view}.tsx. No other files touched (layout.tsx, page.tsx, globals.css, api/, chat-view, image-studio, provider-picker untouched).
+- All are named exports: <AppHeader/>, <BottomNav/>, <OfflineBanner/>, <HomeView/>, <HistoryView/>, <SettingsView/>, each self-contained 'use client' components needing no props.
+- Integration notes for page.tsx (2-c): render <AppHeader/> at top, then <OfflineBanner/> directly under it (it animates height in-flow), then a <main className="mx-auto max-w-3xl pb-28"> that switches on useUIStore view: 'home'-><HomeView/>, 'chat'->ChatView (2-b), 'image'->ImageStudio (2-b), 'history'-><HistoryView/>, 'settings'-><SettingsView/> (wrap in AnimatePresence mode="wait" if desired), and finally <BottomNav/> fixed at bottom. Page must own the pb-28 bottom padding so content never hides under the fixed nav. Views already include their own max-w-3xl px-4 containers; settings is reachable only via header gear (has its own back button).
+- Bottom-nav/chat/image interplay: clicking a home provider card calls setProviderId + startNewChat (draft null) and suggestions call askSuggestion(text) which sets draftMessage — ChatView (2-b) should read draftMessage once on mount then clearDraft().
+
+
+---
+Task ID: 2-b
+Agent: main (Z.ai Code)
+Task: Backend API routes (streaming chat, conversations CRUD, image gen, TTS) + ChatView + ImageStudio + queue flusher
+
+Work Log:
+- Built /api/chat: validates input, creates/fetches conversation, saves user message, builds persona system prompt (fa), streams from z-ai SDK (stream:true yields Uint8Array SSE chunks), re-parses upstream SSE and re-emits clean SSE to client: meta -> delta* -> done (with auto-generated Persian title for first exchange, saved to DB). CRITICAL FIX: pump logic must be fire-and-forget inside start(controller) (NOT awaited) - awaiting start() prevents chunk flushing.
+- /api/conversations GET (list w/ lastMessage + count) and DELETE (clear all); /api/conversations/[id] GET/PATCH/DELETE with params as Promise (Next 16).
+- /api/image POST (validates size; translates Persian prompts to English via LLM first because the image service content-filter rejects Persian text; saves base64 to DB) + GET metadata list; /api/image/[id] GET returns PNG bytes (immutable cache) + DELETE.
+- /api/tts POST: zai.audio.tts.create voice tongtong, wav bytes (works with Persian, clips at 1000 chars).
+- ChatView: streaming fetch reader with SSE parse, offline queueing via lib/offline-queue, stop button (AbortController), retry, auto-scroll with stick-to-bottom, ProviderPicker sheet, draft-message flow from home suggestions, history load guarded by streamingRef + refreshTick.
+- ChatMessage: RTL bubbles (user left, assistant right with gradient avatar), react-markdown + remark-gfm with .md-answer styles, copy + TTS speak buttons, queued/error states, fa-IR timestamps.
+- ImageStudio: prompt + size (3 options) + style chips (English suffix map), rotating fun loading texts, gallery grid with zoom dialog, download, delete, "re-generate with same idea".
+- QueueFlusher (global, in page.tsx): flushes offline queue on connectivity transition OR app-load catch-up, drains SSE, invalidates conversations query, bumps refreshTick if active conversation touched.
+- page.tsx: RTL app shell - AppHeader, OfflineBanner (hidden in chat), AnimatePresence view switch, BottomNav (hidden in chat - focused mode), font-scale effect.
+
+Stage Summary:
+- Bugfixes: undeclared sawConversationId/hadError vars crashed the stream handler (lint missed it, tsc caught it); faTime crash on invalid dates (now defensive); ChatMessageVM got createdAt. remark-gfm installed.
+
+---
+Task ID: 3
+Agent: main (Z.ai Code)
+Task: Final integration + lint
+
+Work Log:
+- page.tsx assembly with all 5 views; QueueFlusher global mount.
+- Fixed tsc errors: chat route conversation typing (select id only), image route size union type (SUPPORTED_SIZES as const + find).
+- bun run lint -> 0 problems; bunx tsc --noEmit -> 0 errors in src/.
+
+Stage Summary:
+- App fully integrated: single page, 5 views, 8 API routes, RTL Persian everywhere.
+
+---
+Task ID: 4
+Agent: main (Z.ai Code)
+Task: End-to-end browser verification with agent-browser + fixes
+
+Work Log:
+- Home renders (hero gradient, Persian date/greeting, capability cards, provider tabs/grid, suggestions). Verified desktop + iPhone 14 viewport.
+- Golden path: suggestion click -> auto-send -> STREAMING assistant reply rendered with markdown, provider avatar, copy/speaker buttons. Conversation continuity verified (follow-up English sentence) + auto Persian titles.
+- Provider switch mid-chat (Grok) works - joke response with new persona.
+- TTS button plays Persian wav (state toggles to stop icon).
+- Image studio: content-filter initially rejected ALL Persian prompts (error toast worked correctly); FIXED via automatic LLM Persian->English prompt translation; verified 3 images generated incl. one from UI.
+- Dark theme verified (warm stone). Offline simulator: header badge flips, banner shows, message queues with "منتظر اتصال" badge, reconnect flushes queue globally (2 POSTs verified in server log, queue emptied, AI reply saved).
+- History view: search, auto-titles, counts, relative times. Final dev.log check: no runtime errors.
+
+Stage Summary:
+- All golden paths verified in real browser (desktop + mobile, light + dark). App is production-ready for PWA wrapping (TWA/Capacitor) for Bazaar/Myket distribution.
