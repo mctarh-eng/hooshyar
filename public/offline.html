@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="fa" dir="rtl">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>هوش‌یار — آفلاین</title>
+    <style>
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      body {
+        font-family: Tahoma, 'Vazirmatn', system-ui, sans-serif;
+        min-height: 100dvh; display: flex; align-items: center; justify-content: center;
+        background: linear-gradient(160deg, #fff7ed, #ffe4e6 60%, #fef3c7);
+        color: #44403c; padding: 24px; text-align: center;
+      }
+      @media (prefers-color-scheme: dark) {
+        body { background: linear-gradient(160deg, #1c1917, #292524 60%, #1c1917); color: #e7e5e4; }
+        .card { background: rgba(41, 37, 36, 0.6) !important; border-color: rgba(120, 113, 108, 0.3) !important; }
+      }
+      .card {
+        background: rgba(255, 255, 255, 0.7); border: 1px solid rgba(251, 146, 60, 0.25);
+        border-radius: 24px; padding: 36px 28px; max-width: 420px; width: 100%;
+        box-shadow: 0 20px 40px rgba(251, 146, 60, 0.12);
+      }
+      .logo { font-size: 56px; animation: float 3s ease-in-out infinite; }
+      @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
+      h1 { font-size: 22px; font-weight: 800; margin: 12px 0 8px; }
+      p { font-size: 14.5px; line-height: 2; opacity: 0.85; }
+      button {
+        margin-top: 22px; border: 0; cursor: pointer; min-height: 48px; padding: 0 32px;
+        border-radius: 16px; font-family: inherit; font-size: 15px; font-weight: 700; color: #fff;
+        background: linear-gradient(135deg, #f97316, #ec4899); box-shadow: 0 8px 20px rgba(249, 115, 22, 0.35);
+      }
+      button:active { transform: scale(0.97); }
+    </style>
+  </head>
+  <body>
+    <main class="card" role="main">
+      <div class="logo" aria-hidden="true">📡</div>
+      <h1>هنوز آفلاینی!</h1>
+      <p>
+        اتصال اینترنت برقرار نیست.<br />
+        وقتی آنلاین شدی، دکمه‌ی زیر رو بزن تا هوش‌یار دوباره برگرده.
+      </p>
+      <button type="button" onclick="location.reload()">تلاش دوباره 🔄</button>
+    </main>
+  </body>
+</html>
