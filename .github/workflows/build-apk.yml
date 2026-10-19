@@ -11,6 +11,14 @@ on:
     tags: ['v*']
   workflow_dispatch:
 
+# HAS_KEYSTORE: secrets context is not allowed in step-level `if`,
+# so we pre-compute it here (env at job level CAN read secrets).
+env:
+  HAS_KEYSTORE: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+
+permissions:
+  contents: write
+
 jobs:
   build:
     name: Build & Sign APK
@@ -44,17 +52,20 @@ jobs:
           echo "برای فعال شدن اپ: Settings → Secrets and variables → Actions → Variables → متغیر CAP_SERVER_URL با آدرس HTTPS اپلیکیشن بساز، بعد دوباره Run workflow بزن." >> $GITHUB_STEP_SUMMARY
 
       - name: Decode release keystore (if provided)
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
-        env:
-          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+        if: ${{ env.HAS_KEYSTORE == 'true' }}
         run: |
           echo "$ANDROID_KEYSTORE_BASE64" | base64 -d > android/app/hooshyar.keystore
           cat > android/keystore.properties <<EOF
           storeFile=hooshyar.keystore
-          storePassword=${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
-          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
-          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          storePassword=$ANDROID_KEYSTORE_PASSWORD
+          keyAlias=$ANDROID_KEY_ALIAS
+          keyPassword=$ANDROID_KEY_PASSWORD
           EOF
+        env:
+          ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
+          ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
+          ANDROID_KEY_ALIAS: ${{ secrets.ANDROID_KEY_ALIAS }}
+          ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
 
       - name: Build Debug APK
         run: |
@@ -63,13 +74,12 @@ jobs:
           ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Build Signed Release APK + AAB
-        if: ${{ secrets.ANDROID_KEYSTORE_BASE64 != '' }}
+        if: ${{ env.HAS_KEYSTORE == 'true' }}
         run: |
           cd android
           ./gradlew assembleRelease bundleRelease --no-daemon --stacktrace
 
       - name: Collect artifacts
-        id: collect
         run: |
           mkdir -p apk-out
           cp android/app/build/outputs/apk/debug/app-debug.apk apk-out/hooshyar-debug.apk 2>/dev/null || true
