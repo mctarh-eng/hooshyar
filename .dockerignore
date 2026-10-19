@@ -1,0 +1,27 @@
+# git & meta
+.git
+.github
+.gitignore
+worklog.md
+dev.log
+server.log
+*.md
+!README.md
+
+# not needed inside the image
+node_modules
+.next
+android
+assets
+docs
+db
+*.db
+.env
+.z-ai-config
+examples
+skills
+.zscripts
+
+# local scratch
+*.log
+.DS_Store

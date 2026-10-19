@@ -31,6 +31,7 @@
         background: linear-gradient(135deg, #f97316, #ec4899); box-shadow: 0 8px 20px rgba(249, 115, 22, 0.35);
       }
       button:active { transform: scale(0.97); }
+      .status { margin-top: 14px; font-size: 12.5px; opacity: 0.55; font-variant-numeric: tabular-nums; }
     </style>
   </head>
   <body>
@@ -39,9 +40,35 @@
       <h1>هنوز آفلاینی!</h1>
       <p>
         اتصال اینترنت برقرار نیست.<br />
-        وقتی آنلاین شدی، دکمه‌ی زیر رو بزن تا هوش‌یار دوباره برگرده.
+        نگران نباش — به‌محض وصل شدن اینترنت،<br />
+        <strong>خودکار</strong> به هوش‌یار برمی‌گردی.
       </p>
       <button type="button" onclick="location.reload()">تلاش دوباره 🔄</button>
+      <p class="status" id="status">در انتظار اتصال…</p>
     </main>
+
+    <script>
+      // auto-return: reload as soon as the connection is back
+      (function () {
+        var status = document.getElementById('status');
+        var dots = 0;
+        setInterval(function () {
+          dots = (dots + 1) % 4;
+          if (status) status.textContent = 'در انتظار اتصال' + '·'.repeat(dots);
+        }, 700);
+        function backOnline() {
+          if (status) status.textContent = 'وصل شد! در حال بازگشت… ✨';
+          setTimeout(function () { location.reload(); }, 600);
+        }
+        window.addEventListener('online', backOnline);
+        // polling fallback (some WebViews don't fire `online`)
+        var tries = 0;
+        (function poll() {
+          tries++;
+          if (navigator.onLine) { backOnline(); return; }
+          if (tries < 240) setTimeout(poll, Math.min(4000 + tries * 500, 15000));
+        })();
+      })();
+    </script>
   </body>
 </html>

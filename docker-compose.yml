@@ -1,0 +1,23 @@
+# ─────────────────────────────────────────────────────────────
+#  هوش‌یار — docker compose
+#  Usage:
+#    cp .env.example .env   ← ویرایش کن (کلید AI)
+#    docker compose up -d --build
+# ─────────────────────────────────────────────────────────────
+services:
+  hooshyar:
+    build: .
+    container_name: hooshyar
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    env_file:
+      - .env
+    environment:
+      # دیتابیس داخل volume ذخیره می‌شود (با ری‌استارت پاک نمی‌شود)
+      DATABASE_URL: file:/app/data/custom.db
+    volumes:
+      - hooshyar-data:/app/data
+
+volumes:
+  hooshyar-data:
