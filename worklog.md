@@ -184,3 +184,22 @@ Work Log:
 Stage Summary:
 - Live: https://github.com/mctarh-eng/hooshyar/releases/download/v1.0.1/hooshyar-debug.apk (4.9MB, correct branded launcher icon incl. adaptive layers).
 - Icon pipeline now reproducible: bun scripts/make-icons.ts && bunx capacitor-assets generate --android.
+
+---
+Task ID: 9
+Agent: main (Z.ai Code)
+Task: Server deployment package + stronger offline support (user asked: "برای سرور باید چیکار کنیم؟ / افلاین چی؟")
+
+Work Log:
+- Investigated SDK auth: z-ai-web-dev-sdk reads JSON config .z-ai-config (baseUrl+apiKey) from ./, ~/ or /etc — on user's own server this must be provided. Sandbox uses /etc/.z-ai-config (never committed).
+- Docker package: multi-stage Dockerfile (oven/bun build -> node:22-slim runner, standalone output, openssl for Prisma, VOLUME /app/data), docker-entrypoint.sh (writes .z-ai-config from ZAI_BASE_URL/ZAI_API_KEY env, prisma db push --skip-generate on boot, exec node server.js), docker-compose.yml (volume hooshyar-data:/app/data, env_file .env, restart unless-stopped), .dockerignore, .env.example (gitignore fixed: !.env.example).
+- Offline upgrade: public/sw.js v3 — GET /api/* now network-first with cache fallback (history + image gallery viewable offline; uncached reads get Persian 503 JSON), navigations fall back to /offline.html, precache allSettled (one 404 can't break install), /logo.svg added to cache-first statics; POST chat/tts/image still never intercepted (offline-queue handles them).
+- public/offline.html: auto-reload on reconnect (online event + polling fallback for WebViews), animated "در انتظار اتصال" status line.
+- docs/DEPLOY-FA.md: full Persian guide — architecture, prerequisites (AI key), Option A Liara (CLI steps, disk /app/data, env set, deploy), Option B Iran VPS + Docker + Caddy HTTPS + backup command, Option C foreign hosts (sanctions warning), wiring CAP_SERVER_URL GitHub Variable -> re-run workflow, troubleshooting table, security notes.
+- README.md: new "🖥️ انتشار روی سرور" section (docker quickstart + link), offline bullet expanded, project tree + roadmap + FAQ updated (on-device AI listed as future).
+- Verified: node --check sw.js OK, sh -n entrypoint OK, compose YAML OK, bun run lint clean, dev server 200 for /, /sw.js, /offline.html.
+- Pushed a3483a9 to main (also carried pending screenshot commit 3cac266 from Task 8 session).
+
+Stage Summary:
+- Deployment story is now self-service: docs/DEPLOY-FA.md + `docker compose up -d --build`. Next step belongs to user: pick host (Liara easiest), get Z.AI API key, deploy, then share URL -> main sets CAP_SERVER_URL Variable and re-tags release so the APK points at the real server.
+- Offline capability matrix: AI chat needs internet (queued); history/images cached-viewable offline; shell + offline.html work fully offline; true on-device AI = roadmap.
