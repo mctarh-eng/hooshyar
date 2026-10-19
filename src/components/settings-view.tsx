@@ -5,7 +5,7 @@ import type { ReactNode } from 'react';
 import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { motion } from 'framer-motion';
-import { ArrowRight, Download, Trash2 } from 'lucide-react';
+import { ArrowRight, Download, Loader2, Trash2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import {
@@ -25,6 +25,13 @@ import { Separator } from '@/components/ui/separator';
 import { Switch } from '@/components/ui/switch';
 import { useClearConversations } from '@/hooks/use-conversations';
 import { useIsConnected, useOnline } from '@/hooks/use-online';
+import {
+  clearLocalChats,
+  getLocalModelOption,
+  hasWebGPU,
+  LOCAL_MODELS,
+  useOnDeviceStore,
+} from '@/lib/ondevice';
 import { useUIStore, type FontScale } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
@@ -106,6 +113,24 @@ export function SettingsView() {
   const mounted = useMounted();
   const [installEvent, setInstallEvent] = useState<BeforeInstallPromptEvent | null>(null);
 
+  // هوش مصنوعی روی دستگاه
+  const odModelId = useOnDeviceStore((s) => s.modelId);
+  const odSetModelId = useOnDeviceStore((s) => s.setModelId);
+  const odDownloadedModelId = useOnDeviceStore((s) => s.downloadedModelId);
+  const odDownloadState = useOnDeviceStore((s) => s.downloadState);
+  const odProgress = useOnDeviceStore((s) => s.progress);
+  const odProgressText = useOnDeviceStore((s) => s.progressText);
+  const odErrorText = useOnDeviceStore((s) => s.errorText);
+  const odPrepare = useOnDeviceStore((s) => s.prepare);
+  const odRemoveModel = useOnDeviceStore((s) => s.removeModel);
+  const odSupported = mounted && hasWebGPU();
+  const odState =
+    odDownloadState === 'downloading' || odDownloadState === 'error'
+      ? odDownloadState
+      : odDownloadedModelId === odModelId
+        ? ('cached' as const)
+        : ('undownloaded' as const);
+
   // اعمال اندازه‌ی قلم روی ریشه‌ی سند
   useEffect(() => {
     const root = document.documentElement;
@@ -150,7 +175,10 @@ export function SettingsView() {
 
   const handleClearAll = () => {
     clearMutation.mutate(undefined, {
-      onSuccess: () => toast.success('همه گفتگوها پاک شدن 🧹'),
+      onSuccess: () => {
+        clearLocalChats();
+        toast.success('همه گفتگوها پاک شدن 🧹');
+      },
       onError: () => toast.error('پاک کردن نشد! دوباره امتحان کن'),
     });
   };
@@ -285,6 +313,136 @@ export function SettingsView() {
         </div>
       </SettingsCard>
 
+      {/* هوش مصنوعی روی دستگاه */}
+      <SettingsCard
+        title="هوش مصنوعی روی دستگاه 📴"
+        desc="بدون اینترنت چت کن — مدل روی پردازنده‌ی خود گوشی اجرا می‌شه"
+      >
+        {!mounted ? null : !odSupported ? (
+          <p className="text-sm leading-7 text-muted-foreground">
+            متأسفانه مرورگر یا WebView این دستگاه از WebGPU پشتیبانی نمی‌کنه.
+            برای اجرای محلی، Android System WebView رو به‌روز نگه دار (نسخه‌ی ۱۲۱ به بالا).
+          </p>
+        ) : (
+          <>
+            <div>
+              <p className="mb-2 text-sm font-medium">مدل</p>
+              <div className="grid grid-cols-2 gap-2">
+                {LOCAL_MODELS.map((m) => {
+                  const active = odModelId === m.id;
+                  return (
+                    <button
+                      key={m.id}
+                      type="button"
+                      aria-pressed={active}
+                      onClick={() => odSetModelId(m.id)}
+                      className={cn(
+                        'rounded-2xl border bg-card p-3 text-start transition-colors',
+                        active
+                          ? 'border-primary ring-2 ring-primary/40'
+                          : 'hover:border-primary/40'
+                      )}
+                    >
+                      <p className="text-sm font-bold">
+                        {m.emoji} {m.label}
+                      </p>
+                      <p className="mt-0.5 text-[11px] leading-5 text-muted-foreground">
+                        {m.desc}
+                      </p>
+                      <p className="mt-1 text-[11px] font-medium">{m.sizeFa}</p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            {odState === 'downloading' ? (
+              <div className="space-y-2">
+                <div className="flex items-center justify-between gap-2 text-xs">
+                  <span className="flex items-center gap-1.5 font-medium">
+                    <Loader2 className="size-3.5 animate-spin" aria-hidden />
+                    در حال دانلود و آماده‌سازی…
+                  </span>
+                  <span>{Math.round(odProgress * 100).toLocaleString('fa-IR')}٪</span>
+                </div>
+                <div
+                  className="h-2 overflow-hidden rounded-full bg-secondary"
+                  role="progressbar"
+                  aria-valuenow={Math.round(odProgress * 100)}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                >
+                  <div
+                    className="h-full rounded-full bg-gradient-to-r from-primary to-rose-400 transition-all"
+                    style={{ width: `${Math.max(2, Math.round(odProgress * 100))}%` }}
+                  />
+                </div>
+                <p dir="ltr" className="truncate text-[10px] text-muted-foreground">
+                  {odProgressText}
+                </p>
+                <p className="text-[11px] leading-5 text-muted-foreground">
+                  این صفحه رو نبند تا دانلود کامل شه 🙏
+                </p>
+              </div>
+            ) : odState === 'cached' ? (
+              <div className="flex items-center justify-between gap-3 rounded-2xl bg-secondary/60 p-4">
+                <div className="min-w-0">
+                  <p className="text-sm font-medium">مدل آماده است ✅</p>
+                  <p className="text-xs text-muted-foreground">
+                    از این به بعد بدون اینترنت هم کار می‌کنه
+                  </p>
+                </div>
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="destructive" size="sm" className="h-9 shrink-0 rounded-xl px-3">
+                      حذف مدل
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent className="rounded-3xl">
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>مدل آفلاین حذف بشه؟</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        مدل دانلودشده پاک می‌شه و برای استفاده‌ی دوباره باید یک‌بار دیگه دانلودش کنی. گفتگوها پاک نمی‌شن.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>نه، بیخیال</AlertDialogCancel>
+                      <AlertDialogAction
+                        className="bg-destructive text-white hover:bg-destructive/90"
+                        onClick={() => void odRemoveModel()}
+                      >
+                        آره، حذف کن
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </div>
+            ) : odState === 'error' ? (
+              <div className="space-y-3">
+                <p className="text-xs leading-6 text-rose-600 dark:text-rose-400">
+                  دانلود کامل نشد: {odErrorText ?? 'خطای ناشناخته'}
+                </p>
+                <Button onClick={() => void odPrepare()} className="h-11 rounded-2xl px-5 font-bold">
+                  <Download className="size-4" aria-hidden />
+                  تلاش دوباره
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Button onClick={() => void odPrepare()} className="h-11 rounded-2xl px-5 font-bold">
+                  <Download className="size-4" aria-hidden />
+                  دانلود مدل ({getLocalModelOption(odModelId).sizeFa})
+                </Button>
+                <p className="text-xs leading-6 text-muted-foreground">
+                  دانلود فقط یک‌بار و با اینترنت انجام می‌شه؛ بعدش همه‌چیز کاملاً آفلاین کار می‌کنه.
+                  گفتگوهای آفلاین فقط روی خود دستگاه ذخیره می‌شن و جایی نمی‌رن.
+                </p>
+              </div>
+            )}
+          </>
+        )}
+      </SettingsCard>
+
       {/* نصب برنامه */}
       <SettingsCard title="نصب برنامه 📲" desc="هوش‌یار رو روی گوشی یا دسکتاپت نصب کن">
         <div className="flex flex-wrap items-center gap-3">
@@ -354,7 +512,7 @@ export function SettingsView() {
             <div className="flex flex-wrap items-center gap-2">
               <p className="font-bold">هوش‌یار</p>
               <Badge variant="secondary" className="rounded-full">
-                نسخه ۱٫۰٫۰
+                نسخه ۱٫۱٫۰
               </Badge>
             </div>
             <p className="text-sm leading-7 text-muted-foreground">

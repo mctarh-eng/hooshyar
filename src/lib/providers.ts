@@ -1,4 +1,4 @@
-export type ProviderOrigin = 'iran' | 'global';
+export type ProviderOrigin = 'iran' | 'global' | 'local';
 
 export interface AIProvider {
   id: string;
@@ -12,6 +12,8 @@ export interface AIProvider {
   specialties: string[];
   /** personality injected into the system prompt */
   persona: string;
+  /** runs fully on the user's device (no server, no internet) */
+  local?: boolean;
 }
 
 export const PROVIDERS: AIProvider[] = [
@@ -134,6 +136,18 @@ export const PROVIDERS: AIProvider[] = [
     specialties: ['طنز', 'پاسخ رک', 'سرگرمی'],
     persona:
       'بامزه و طنزپرداز باش ولی مفید؛ رک و بی‌تعارف جواب بده و با شوخی‌های به‌جا مکالمه رو شاد نگه دار.',
+  },
+  {
+    id: 'local',
+    name: 'هوش‌یارِ آفلاین',
+    latinName: 'On-Device',
+    origin: 'local',
+    local: true,
+    emoji: '📴',
+    gradient: 'from-slate-400 to-zinc-600',
+    tagline: 'بدون اینترنت، روی پردازنده‌ی خود گوشیت',
+    specialties: ['آفلاین', 'خصوصی', 'بدون سرور'],
+    persona: '', // never sent to any server — local model has its own system prompt
   },
 ];
 

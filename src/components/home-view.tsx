@@ -120,7 +120,7 @@ export function HomeView() {
 
   const filteredProviders =
     providerTab === 'all'
-      ? PROVIDERS
+      ? PROVIDERS.filter((p) => !p.local) // دستیار آفلاین از پیکر جدا انتخاب می‌شه
       : PROVIDERS.filter((p) => p.origin === providerTab);
 
   return (

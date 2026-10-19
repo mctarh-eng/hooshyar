@@ -37,6 +37,11 @@ import {
   useDeleteConversation,
   useRenameConversation,
 } from '@/hooks/use-conversations';
+import {
+  deleteLocalChat,
+  listLocalChats,
+  renameLocalChat,
+} from '@/lib/ondevice';
 import { getProvider } from '@/lib/providers';
 import { useUIStore } from '@/lib/store';
 import type { ConversationSummary } from '@/lib/types';
@@ -86,6 +91,11 @@ function HistoryRow({
       </div>
 
       <div className="flex shrink-0 items-center gap-0.5">
+        {conversation.id.startsWith('local_') && (
+          <span className="rounded-full bg-secondary px-2 py-0.5 text-[9px] text-secondary-foreground">
+            📴 آفلاین
+          </span>
+        )}
         <span className="text-[11px] text-muted-foreground">
           {timeAgo(conversation.updatedAt)}
         </span>
@@ -123,6 +133,7 @@ function HistoryRow({
 export function HistoryView() {
   const openConversation = useUIStore((s) => s.openConversation);
   const startNewChat = useUIStore((s) => s.startNewChat);
+  const refreshTick = useUIStore((s) => s.refreshTick);
 
   const { data: conversations, isLoading, isError } = useConversationList();
   const renameMutation = useRenameConversation();
@@ -132,9 +143,24 @@ export function HistoryView() {
   const [renameTarget, setRenameTarget] = useState<ConversationSummary | null>(null);
   const [renameValue, setRenameValue] = useState('');
   const [deleteTarget, setDeleteTarget] = useState<ConversationSummary | null>(null);
+  const [localVersion, setLocalVersion] = useState(0);
+
+  // گفتگوهای آفلاین (فقط روی همین دستگاه)
+  const localSummaries = useMemo<ConversationSummary[]>(() => {
+    void refreshTick;
+    return listLocalChats().map((c) => ({
+      id: c.id,
+      title: c.title,
+      providerId: 'local',
+      createdAt: c.updatedAt,
+      updatedAt: c.updatedAt,
+      lastMessage: c.lastMessage || null,
+      messageCount: 0,
+    }));
+  }, [localVersion, refreshTick]);
 
   const filtered = useMemo(() => {
-    const list = conversations ?? [];
+    const list = [...localSummaries, ...(conversations ?? [])];
     const q = query.trim();
     const base = q
       ? list.filter(
@@ -144,7 +170,7 @@ export function HistoryView() {
     return [...base].sort(
       (a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()
     );
-  }, [conversations, query]);
+  }, [conversations, localSummaries, query]);
 
   const isEmpty = !isLoading && filtered.length === 0;
   const countLabel = filtered.length.toLocaleString('fa-IR');
@@ -153,6 +179,13 @@ export function HistoryView() {
     if (!renameTarget) return;
     const title = renameValue.trim();
     if (!title) return;
+    if (renameTarget.id.startsWith('local_')) {
+      renameLocalChat(renameTarget.id, title);
+      setLocalVersion((v) => v + 1);
+      toast.success('نام عوض شد ✅');
+      setRenameTarget(null);
+      return;
+    }
     renameMutation.mutate(
       { id: renameTarget.id, title },
       {
@@ -167,6 +200,13 @@ export function HistoryView() {
 
   const handleDelete = () => {
     if (!deleteTarget) return;
+    if (deleteTarget.id.startsWith('local_')) {
+      deleteLocalChat(deleteTarget.id);
+      setLocalVersion((v) => v + 1);
+      toast.success('حذف شد 🗑️');
+      setDeleteTarget(null);
+      return;
+    }
     deleteMutation.mutate(deleteTarget.id, {
       onSuccess: () => {
         toast.success('حذف شد 🗑️');

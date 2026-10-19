@@ -23,6 +23,8 @@ interface ChatMessageProps {
   providerGradient: string;
   providerName: string;
   isSpeaking: boolean;
+  /** TTS needs the server — hide it for on-device messages when unavailable */
+  canSpeak?: boolean;
   onSpeak: (text: string, id: string) => void;
   onRetry?: () => void;
 }
@@ -43,6 +45,7 @@ export function ChatMessage({
   providerGradient,
   providerName,
   isSpeaking,
+  canSpeak = true,
   onSpeak,
   onRetry,
 }: ChatMessageProps) {
@@ -147,21 +150,23 @@ export function ChatMessage({
                 <Copy className="h-3.5 w-3.5" />
               )}
             </button>
-            <button
-              type="button"
-              onClick={() => onSpeak(message.content, message.id)}
-              aria-label={isSpeaking ? 'توقف خواندن' : 'خواندن با صدا'}
-              className={cn(
-                'flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-secondary',
-                isSpeaking ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
-              )}
-            >
-              {isSpeaking ? (
-                <VolumeX className="h-3.5 w-3.5 animate-pulse" />
-              ) : (
-                <Volume2 className="h-3.5 w-3.5" />
-              )}
-            </button>
+            {canSpeak && (
+              <button
+                type="button"
+                onClick={() => onSpeak(message.content, message.id)}
+                aria-label={isSpeaking ? 'توقف خواندن' : 'خواندن با صدا'}
+                className={cn(
+                  'flex h-7 w-7 items-center justify-center rounded-full transition-colors hover:bg-secondary',
+                  isSpeaking ? 'text-primary' : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                {isSpeaking ? (
+                  <VolumeX className="h-3.5 w-3.5 animate-pulse" />
+                ) : (
+                  <Volume2 className="h-3.5 w-3.5" />
+                )}
+              </button>
+            )}
             <span className="text-[10px] text-muted-foreground">
               {faTime(message.createdAt ?? new Date().toISOString())}
             </span>

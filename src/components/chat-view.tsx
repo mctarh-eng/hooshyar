@@ -17,6 +17,18 @@ import { ChatMessage, type ChatMessageVM } from '@/components/chat-message';
 import { ProviderPicker } from '@/components/provider-picker';
 import { useIsConnected } from '@/hooks/use-online';
 import { enqueueMessage } from '@/lib/offline-queue';
+import {
+  appendLocalMessage,
+  createLocalChat,
+  getLocalChatMessages,
+  hasWebGPU,
+  isEngineLoaded,
+  LOCAL_SYSTEM_PROMPT,
+  streamLocalChat,
+  useOnDeviceStore,
+  type LocalChatMessage,
+  type LocalTurn,
+} from '@/lib/ondevice';
 import { getProvider } from '@/lib/providers';
 import { useUIStore } from '@/lib/store';
 import type { ConversationDetail } from '@/lib/types';
@@ -85,6 +97,24 @@ export function ChatView() {
       setMessages([]);
       return;
     }
+
+    // local (on-device) conversations live only in this browser/device
+    if (activeConversationId.startsWith('local_')) {
+      setMessages(
+        getLocalChatMessages(activeConversationId).map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          providerId: 'local' as const,
+          createdAt: m.createdAt,
+          status: 'ok' as const,
+        }))
+      );
+      if (useUIStore.getState().providerId !== 'local') setProviderId('local');
+      requestAnimationFrame(() => scrollToBottom(false));
+      return;
+    }
+
     let cancelled = false;
     (async () => {
       try {
@@ -162,6 +192,159 @@ export function ChatView() {
 
   useEffect(() => stopSpeaking, [stopSpeaking]);
 
+  // ---- on-device (offline) send: runs the model on the phone itself ----
+  const sendLocal = useCallback(async (rawText: string) => {
+    const text = rawText.trim();
+    if (!text || streamingRef.current) return;
+
+    if (!hasWebGPU()) {
+      toast.error('دستگاهت از اجرای محلی پشتیبانی نمی‌کنه (WebGPU نداره) 😕');
+      return;
+    }
+    const od = useOnDeviceStore.getState();
+    if (od.downloadedModelId !== od.modelId) {
+      toast.error(
+        'اول مدل آفلاین رو دانلود کن: تنظیمات ← هوش مصنوعی روی دستگاه 📴',
+        { duration: 6000 }
+      );
+      return;
+    }
+
+    // local conversations are stored only on this device
+    let convId = useUIStore.getState().activeConversationId;
+    if (!convId || !convId.startsWith('local_')) {
+      const meta = createLocalChat(od.modelId);
+      useUIStore.setState({ activeConversationId: meta.id, view: 'chat' });
+      convId = meta.id;
+    }
+    const localConvId: string = convId;
+
+    const userMsg: LocalChatMessage = {
+      id: `u_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      role: 'user',
+      content: text,
+      createdAt: new Date().toISOString(),
+    };
+    const isFirst = getLocalChatMessages(localConvId).length === 0;
+    appendLocalMessage(localConvId, userMsg, {
+      title: isFirst ? text.slice(0, 40) : undefined,
+    });
+
+    lastUserTextRef.current = text;
+    const assistantTempId = `a_${Date.now()}_${Math.random()
+      .toString(36)
+      .slice(2, 7)}`;
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: userMsg.id,
+        role: 'user',
+        content: text,
+        createdAt: userMsg.createdAt,
+        status: 'ok' as const,
+      },
+    ]);
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: assistantTempId,
+        role: 'assistant' as const,
+        content: '',
+        providerId: 'local',
+        createdAt: new Date().toISOString(),
+        status: 'sending' as const,
+      },
+    ]);
+
+    streamingRef.current = true;
+    setStreaming(true);
+    stickToBottomRef.current = true;
+    const ac = new AbortController();
+    abortRef.current = ac;
+
+    const loadToast = isEngineLoaded(od.modelId)
+      ? null
+      : toast.loading('در حال آماده‌سازی دستیار روی دستگاه…');
+    let dismissed = false;
+    const onDelta = (delta: string) => {
+      if (!dismissed) {
+        dismissed = true;
+        if (loadToast) toast.dismiss(loadToast);
+      }
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === assistantTempId ? { ...m, content: m.content + delta } : m
+        )
+      );
+    };
+
+    try {
+      const history: LocalTurn[] = getLocalChatMessages(localConvId)
+        .filter((m) => m.id !== userMsg.id)
+        .slice(-10)
+        .map((m) => ({ role: m.role, content: m.content }));
+      const full = await streamLocalChat({
+        modelId: od.modelId,
+        system: LOCAL_SYSTEM_PROMPT,
+        history,
+        userText: text,
+        onDelta,
+        signal: ac.signal,
+      });
+      if (full.trim()) {
+        appendLocalMessage(localConvId, {
+          id: assistantTempId,
+          role: 'assistant',
+          content: full,
+          createdAt: new Date().toISOString(),
+        });
+      }
+      if (ac.signal.aborted && !full.trim()) {
+        setMessages((prev) => prev.filter((m) => m.id !== assistantTempId));
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantTempId
+              ? { ...m, status: 'ok' as const, content: m.content || full }
+              : m
+          )
+        );
+      }
+    } catch (e) {
+      const aborted =
+        ac.signal.aborted ||
+        (e instanceof DOMException && e.name === 'AbortError');
+      if (aborted) {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantTempId ? { ...m, status: 'ok' as const } : m
+          )
+        );
+      } else {
+        setMessages((prev) =>
+          prev.map((m) =>
+            m.id === assistantTempId ? { ...m, status: 'error' as const } : m
+          )
+        );
+        // engine failed to load → cached weights are probably gone (cleared storage)
+        if (!isEngineLoaded(od.modelId)) {
+          useOnDeviceStore.getState().resetDownload();
+        }
+        toast.error(
+          e instanceof Error && e.message && e.message.length < 60
+            ? e.message
+            : 'اجرای محلی ممکن نشد؛ از تنظیمات مدل رو دوباره آماده کن'
+        );
+      }
+    } finally {
+      if (loadToast) toast.dismiss(loadToast);
+      streamingRef.current = false;
+      setStreaming(false);
+      abortRef.current = null;
+      useUIStore.getState().bumpRefreshTick();
+    }
+  }, []);
+
   // ---- send message (streaming) ----
   const sendMessage = useCallback(
     async (rawText: string, opts?: { fromQueue?: boolean }) => {
@@ -170,6 +353,13 @@ export function ChatView() {
 
       lastUserTextRef.current = text;
       const providerIdNow = useUIStore.getState().providerId;
+
+      // on-device assistant handles everything itself (works offline)
+      if (providerIdNow === 'local') {
+        await sendLocal(text);
+        return;
+      }
+
       const convIdNow = useUIStore.getState().activeConversationId;
       const userTempId = `u_${Date.now()}_${Math.random()
         .toString(36)
@@ -343,7 +533,7 @@ export function ChatView() {
         abortRef.current = null;
       }
     },
-    []
+    [sendLocal]
   );
 
   const sendMessageRef = useRef(sendMessage);
@@ -436,7 +626,9 @@ export function ChatView() {
       {!connected && (
         <div className="flex items-center justify-center gap-2 bg-amber-100 px-3 py-1.5 text-xs font-medium text-amber-900 dark:bg-amber-950/50 dark:text-amber-200">
           <WifiOff className="h-3.5 w-3.5" />
-          آفلاینی — پیام‌هات ذخیره می‌شن و بعد از اتصال می‌رن
+          {providerId === 'local'
+            ? 'آفلاینی ولی دستیار روی دستگاه کار می‌کنه ✨'
+            : 'آفلاینی — پیام‌هات ذخیره می‌شن و بعد از اتصال می‌رن'}
         </div>
       )}
 
@@ -493,6 +685,7 @@ export function ChatView() {
             providerGradient={provider.gradient}
             providerName={provider.name}
             isSpeaking={speakingId === m.id}
+            canSpeak={provider.id !== 'local'}
             onSpeak={handleSpeak}
             onRetry={
               m.status === 'error' && idx === messages.length - 1

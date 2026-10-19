@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Check } from 'lucide-react';
+import { toast } from 'sonner';
 import {
   Sheet,
   SheetContent,
@@ -10,7 +11,9 @@ import {
   SheetHeader,
   SheetTitle,
 } from '@/components/ui/sheet';
+import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { hasWebGPU, useOnDeviceStore } from '@/lib/ondevice';
 import { PROVIDERS } from '@/lib/providers';
 import { cn } from '@/lib/utils';
 
@@ -28,12 +31,30 @@ export function ProviderPicker({
   onSelect,
 }: ProviderPickerProps) {
   const [tab, setTab] = useState<'all' | 'iran' | 'global'>('all');
+  const downloadedModelId = useOnDeviceStore((s) => s.downloadedModelId);
+  const modelId = useOnDeviceStore((s) => s.modelId);
+  const localSupported = hasWebGPU();
+  const localReady = downloadedModelId === modelId;
 
   const list = useMemo(() => {
-    if (tab === 'iran') return PROVIDERS.filter((p) => p.origin === 'iran');
-    if (tab === 'global') return PROVIDERS.filter((p) => p.origin === 'global');
-    return PROVIDERS;
+    const cloud = PROVIDERS.filter((p) => !p.local);
+    if (tab === 'iran') return cloud.filter((p) => p.origin === 'iran');
+    if (tab === 'global') return cloud.filter((p) => p.origin === 'global');
+    return cloud;
   }, [tab]);
+
+  const handleLocalSelect = () => {
+    onSelect('local');
+    onOpenChange(false);
+    if (!localSupported) {
+      toast.error('دستگاهت از اجرای محلی پشتیبانی نمی‌کنه (WebGPU نداره) 😕');
+    } else if (!localReady) {
+      toast.info(
+        'برای شروع، مدل آفلاین رو یک‌بار دانلود کن: تنظیمات ← هوش مصنوعی روی دستگاه 📴',
+        { duration: 6000 }
+      );
+    }
+  };
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>
@@ -47,6 +68,52 @@ export function ProviderPicker({
             هر دستیار یه شخصیت متفاوت داره؛ هر وقت خواستی عوضش کن!
           </SheetDescription>
         </SheetHeader>
+
+        {/* دستیار روی دستگاه — همیشه بالای لیست */}
+        <button
+          type="button"
+          onClick={handleLocalSelect}
+          aria-pressed={selectedId === 'local'}
+          className={cn(
+            'flex w-full items-center gap-3 rounded-2xl border border-dashed bg-card p-3.5 text-start transition-colors',
+            selectedId === 'local'
+              ? 'border-primary ring-2 ring-primary/40'
+              : 'hover:border-primary/50'
+          )}
+        >
+          <span
+            className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-slate-400 to-zinc-600 text-xl"
+            aria-hidden
+          >
+            📴
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="flex items-center gap-2">
+              <span className="truncate text-sm font-bold">هوش‌یارِ آفلاین</span>
+              {!localSupported ? (
+                <Badge variant="secondary" className="shrink-0 rounded-full text-[9px]">
+                  WebGPU نداری
+                </Badge>
+              ) : localReady ? (
+                <Badge className="shrink-0 rounded-full border border-emerald-200 bg-emerald-100 text-[9px] text-emerald-800 dark:border-emerald-900 dark:bg-emerald-950 dark:text-emerald-300">
+                  آماده ✅
+                </Badge>
+              ) : (
+                <Badge className="shrink-0 rounded-full border border-amber-200 bg-amber-100 text-[9px] text-amber-800 dark:border-amber-900 dark:bg-amber-950 dark:text-amber-300">
+                  نیاز به دانلود
+                </Badge>
+              )}
+            </span>
+            <span className="mt-0.5 block truncate text-[10px] text-muted-foreground">
+              بدون اینترنت، روی پردازنده‌ی خود گوشیت — گفتگوها فقط روی دستگاه ذخیره می‌شن
+            </span>
+          </span>
+          {selectedId === 'local' && (
+            <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+              <Check className="h-3 w-3" />
+            </span>
+          )}
+        </button>
 
         <Tabs
           value={tab}

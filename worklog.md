@@ -203,3 +203,25 @@ Work Log:
 Stage Summary:
 - Deployment story is now self-service: docs/DEPLOY-FA.md + `docker compose up -d --build`. Next step belongs to user: pick host (Liara easiest), get Z.AI API key, deploy, then share URL -> main sets CAP_SERVER_URL Variable and re-tags release so the APK points at the real server.
 - Offline capability matrix: AI chat needs internet (queued); history/images cached-viewable offline; shell + offline.html work fully offline; true on-device AI = roadmap.
+
+---
+Task ID: 10
+Agent: main (Z.ai Code)
+Task: On-device AI — chat fully offline using the phone's own processor (WebLLM/Qwen3.5 in WebView via WebGPU)
+
+Work Log:
+- Installed @mlc-ai/web-llm@0.2.86; confirmed prebuilt Qwen3.5 models (picked Qwen3.5-0.8B-q4f16_1-MLC «مینی ~600MB» + Qwen3.5-2B-q4f16_1-MLC «قوی‌تر ~1.3GB») and cache names webllm/config|model|wasm (for delete).
+- src/lib/ondevice.ts: hasWebGPU(), model catalog, lazy dynamic-import engine singleton (loadEngine with initProgressCallback, unload on model switch), streamLocalChat() (temperature 0.7, system prompt + /no_think soft switch, robust <think>…</think> filter with partial-tag pending buffer, AbortSignal + interruptGenerate), localStorage local chat store (listLocalChats/getLocalChatMessages/createLocalChat/appendLocalMessage/rename/delete/clear — ids prefixed local_), useOnDeviceStore (zustand+persist: modelId + downloadedModelId persisted; runtime download state/progress; prepare/resetDownload/removeModel).
+- providers.ts: origin 'local' + local flag; new provider «هوش‌یارِ آفلاین» 📴 (id 'local').
+- chat-view.tsx: local branch in history-load effect (reads localStorage, sets provider), sendLocal() flow (creates local chat, persists user+assistant messages, streaming with stop via AbortController, engine-load loading toast, resets download state if engine fails to load — cache probably cleared), local send bypasses offline queue (works offline), banner text differs for local, canSpeak=false for local (TTS is server-side).
+- chat-message.tsx: optional canSpeak prop hides speaker button for on-device replies.
+- provider-picker.tsx: pinned dashed card at top (status badge: آماده ✅ / نیاز به دانلود / WebGPU نداری) + hint toasts; local filtered out of the 3 tabs.
+- home-view.tsx: local filtered out of the provider grid (picker is its entry point).
+- history-view.tsx: local chats merged into list (📴 آفلاین badge), rename/delete branch to localStorage handlers, refresh via localVersion + refreshTick.
+- settings-view.tsx: new «هوش مصنوعی روی دستگاه 📴» card (WebGPU support detection, 2-model chooser with sizes, download button → progress bar with fa-IR percent + engine progress text, cached state + best-effort delete weights, error state + retry; note about one-time download + device-only chats). Version badge → ۱٫۱٫۰. Clear-all also clears local chats.
+- Verified in agent-browser (headless): home hides local from grid; picker pinned card shows correct badge; selecting local switches chat header to 📴; settings card renders both models; download attempt ran REAL WebGPU init and failed with "Unable to find a compatible GPU" (headless has navigator.gpu but no GPU) → captured gracefully in error state with retry; chat send before download blocked with guidance toast; switching back to cloud provider → streaming works (no regression); history view OK; zero page errors; lint clean; tsc src/ clean.
+- Honest limitation: real GPU generation can't be tested in this sandbox (no GPU) — needs a real phone/WebView 121+.
+- README: on-device feature bullet, FAQ (requirements + expectations), roadmap [x].
+
+Stage Summary:
+- On-device AI is wired end-to-end: provider → picker → chat → local persistence → history → settings/model manager. Model weights cached per device (one-time download from HF CDN). Local chats never leave the device. Release will be tagged v1.1.0 after CI green.
