@@ -4,9 +4,12 @@ on:
   push:
     branches: [main]
     paths:
+      - 'src/**'
       - 'android/**'
       - 'capacitor.config.ts'
       - 'public/**'
+      - 'package.json'
+      - 'bun.lock'
       - '.github/workflows/build-apk.yml'
     tags: ['v*']
   workflow_dispatch:
