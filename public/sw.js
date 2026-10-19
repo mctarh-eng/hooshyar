@@ -1,9 +1,9 @@
 /* Hooshyar service worker - PWA offline shell */
-const CACHE_NAME = 'hooshyar-v1';
+const CACHE_NAME = 'hooshyar-v2';
 const PRECACHE_URLS = [
   '/',
   '/manifest.json',
-  '/icons/icon-192.png',
+  '/icons/icon-192.png?v=2',
   '/icons/icon-512.png',
 ];
 

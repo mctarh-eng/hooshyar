@@ -1,6 +1,5 @@
 'use client';
 
-import Image from 'next/image';
 import { useTheme } from 'next-themes';
 import { useSyncExternalStore } from 'react';
 import { Moon, Settings, Sun, WifiOff } from 'lucide-react';
@@ -32,13 +31,14 @@ export function AppHeader() {
       <div className="mx-auto flex h-16 w-full max-w-3xl items-center justify-between gap-2 px-4">
         {/* لوگو و نام برنامه (سمت شروع در RTL) */}
         <div className="flex min-w-0 items-center gap-2.5">
-          <Image
-            src="/icons/icon-192.png"
+          {/* plain img: 36px decorative logo, no optimizer needed; ?v=N busts icon cache on updates */}
+          <img
+            src="/icons/icon-192.png?v=2"
             alt="آیکون هوش‌یار"
             width={36}
             height={36}
             className="rounded-xl shadow-sm"
-            priority
+            loading="eager"
           />
           <div className="min-w-0 leading-tight">
             <p className="text-lg font-extrabold">هوش‌یار</p>
