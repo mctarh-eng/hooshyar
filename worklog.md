@@ -105,3 +105,22 @@ Work Log:
 
 Stage Summary:
 - All golden paths verified in real browser (desktop + mobile, light + dark). App is production-ready for PWA wrapping (TWA/Capacitor) for Bazaar/Myket distribution.
+
+---
+Task ID: 5
+Agent: main (Z.ai Code)
+Task: Post-continuation final verification (new session - "اضافه کن برام")
+
+Work Log:
+- Confirmed dev server running on :3000 (200 OK) and `bun run lint` clean (0 problems).
+- Read dev.log: chat SSE, image generation, TTS and conversations flows all logging 200s, no runtime errors.
+- Agent-browser end-to-end re-verification:
+  - Home view: RTL hero, greeting «صبح بخیر!», fa-IR date, capability cards, 10 provider cards, tabs, suggestions all render.
+  - Golden path: «شروع گفتگو» -> typed «سلام! خودت رو در دو جمله معرفی کن» -> streamed Persian reply with copy/speaker buttons and fa timestamps.
+  - History: 14 conversations listed with auto Persian titles, avatars, relative times.
+  - Image studio: prompt/size/style controls + gallery with 3 saved images.
+  - Settings: theme + font scale segmented controls, connection section.
+  - Zero console errors / zero page errors. iPhone 14 viewport renders correctly (RTL, bottom nav, safe layout).
+
+Stage Summary:
+- App re-verified end-to-end after session continuation; no regressions found. هوش‌یار is complete and production-ready for PWA/TWA wrapping toward Bazaar/Myket publishing.
