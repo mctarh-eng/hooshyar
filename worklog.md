@@ -145,3 +145,22 @@ Work Log:
 
 Stage Summary:
 - Repo is 100% ready to push to GitHub. Once user provides a fine-grained PAT (admin:repo create + contents write + actions write), I: create repo -> push -> workflow auto-builds APK -> user downloads artifact. Signing works when they add the 4 keystore secrets. Web app still needs deployment (CAP_SERVER_URL) for the APK to reach its AI backend.
+
+---
+Task ID: 7
+Agent: main (Z.ai Code)
+Task: GitHub connection, repo creation, live APK build & release
+
+Work Log:
+- User provided classic PAT (scopes: repo, workflow) -> authenticated as mctarh-eng. No existing repos found (user mentioned a different name but had created nothing yet).
+- Safety pass before push: untracked .env + db/custom.db (user data/secrets), added *.db + db/custom.db to .gitignore, committed.
+- Created PUBLIC repo mctarh-eng/hooshyar (offered instant rename), pushed main (193 files) -> workflow auto-triggered.
+- Run#1 failed at parse (secrets context not allowed in step-level if) -> FIXED via job-level env HAS_KEYSTORE + permissions:contents:write.
+- Run#2 failed at gradle: "invalid source release: 21" (Capacitor 8 needs JDK 21) -> FIXED: setup-java 21.
+- Run#3 SUCCESS: artifact hooshyar-apk 6.0MB (30d retention). Downloaded & verified: valid APK w/ signing block, 19 icons, 30 splash resources, 465 entries.
+- Tagged v1.0.0 -> run#4 SUCCESS -> GitHub Release v1.0.0 with hooshyar-debug.apk (6.7MB, public direct download).
+- Remote/token not persisted in git config (pushed via inline credential URL).
+
+Stage Summary:
+- Live deliverables: repo https://github.com/mctarh-eng/hooshyar ; Release APK https://github.com/mctarh-eng/hooshyar/releases/download/v1.0.0/hooshyar-debug.apk
+- Remaining for production: deploy web app -> set repo Variable CAP_SERVER_URL -> re-run workflow; add 4 keystore secrets for signed release/AAB; rename repo on request.
