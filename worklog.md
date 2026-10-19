@@ -124,3 +124,24 @@ Work Log:
 
 Stage Summary:
 - App re-verified end-to-end after session continuation; no regressions found. هوش‌یار is complete and production-ready for PWA/TWA wrapping toward Bazaar/Myket publishing.
+
+---
+Task ID: 6
+Agent: main (Z.ai Code)
+Task: Android APK pipeline (Capacitor) + GitHub Actions CI + Persian APK guide
+
+Work Log:
+- Verified environment: git 2.47.3 + existing .git repo, github.com reachable (api.github.com 403 was shared-IP rate limit only), Java 21 present locally (no Android SDK -> CI build is the right path).
+- Installed @capacitor/cli@8.5.3, @capacitor/core, @capacitor/android, @capacitor/assets (dev deps).
+- capacitor.config.ts: appId ir.hooshyar.app, appName هوش‌یار, webDir public, server.url from CAP_SERVER_URL env (fallback placeholder), cleartext:false, errorPath offline.html, SplashScreen plugin warm colors.
+- bunx cap add android -> full Gradle project (JDK 17 compatible, compileSdk 36, Gradle 8.14.3).
+- Generated adaptive icons + splash (light/dark, all densities, 38 files) from public/icons/icon-1024.png via @capacitor/assets + sharp-made 2732x2732 splash sources in assets/.
+- public/offline.html: RTL Persian offline fallback (matches app theme, reload button) used by server.errorPath.
+- android/app/build.gradle: conditional release signing via android/keystore.properties (storeFile/storePassword/keyAlias/keyPassword) - only active when file exists.
+- android/.gitignore: added keystore.properties, *.keystore, *.jks (never commit secrets).
+- .github/workflows/build-apk.yml (12 steps, YAML-validated): push(main)/tags/workflow_dispatch -> JDK17 + Bun -> bun install --frozen-lockfile -> cap sync (CAP_SERVER_URL from repo Variables) -> gradlew assembleDebug -> optional signed assembleRelease+bundleRelease when secrets present -> artifacts "hooshyar-apk" (retention 30d) -> GitHub Release on v* tags. Warns in step summary if CAP_SERVER_URL unset.
+- public/offline.html + package.json scripts (cap:sync, cap:android) + docs/APK-GUIDE.md (full Persian guide: fine-grained PAT steps, artifact download, CAP_SERVER_URL variable, keystore signing for stores, Bazaar/Myket notes).
+- bun run lint: 0 problems. Committed everything: 05ce096.
+
+Stage Summary:
+- Repo is 100% ready to push to GitHub. Once user provides a fine-grained PAT (admin:repo create + contents write + actions write), I: create repo -> push -> workflow auto-builds APK -> user downloads artifact. Signing works when they add the 4 keystore secrets. Web app still needs deployment (CAP_SERVER_URL) for the APK to reach its AI backend.
