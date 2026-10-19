@@ -164,3 +164,23 @@ Work Log:
 Stage Summary:
 - Live deliverables: repo https://github.com/mctarh-eng/hooshyar ; Release APK https://github.com/mctarh-eng/hooshyar/releases/download/v1.0.0/hooshyar-debug.apk
 - Remaining for production: deploy web app -> set repo Variable CAP_SERVER_URL -> re-run workflow; add 4 keystore secrets for signed release/AAB; rename repo on request.
+
+---
+Task ID: 8
+Agent: main (Z.ai Code)
+Task: Fix launcher icon + rich Persian GitHub README + Release v1.0.1
+
+Work Log:
+- Root-caused "app has no icon": android adaptive icon foreground/background were still the default Capacitor blue logo on white (capacitor-assets had only replaced legacy PNGs). On modern Android launchers the adaptive icon wins -> generic look.
+- Built scripts/make-icons.ts: programmatic brand SVG (warm gradient #FBBF24->#F97316->#EC4899 + white 4-point sparkle marks, all inside adaptive safe zone r<=338/1024). Outputs icon-only/foreground/background + 2732 splash (light/dark, rounded tile) + web icons + public/logo.svg.
+- Ran make-icons + capacitor-assets -> 74 android resources regenerated; verified adaptive XML now insets @mipmap/ic_launcher_background (gradient PNG) + sparkle foreground.
+- Web icon cache saga: Next.js .next/cache/images purge + dev-server restart were NOT enough (browser kept stale decoded bitmap keyed by URL). Fix: cache-busted all icon refs to ?v=2 (app-header, layout metadata, manifest.json, sw.js) and bumped SW cache to hooshyar-v2. next/image rejects local query strings -> switched header logo to plain <img> (36px decorative).
+- Dev server restart learned: only `setsid nohup bash .zscripts/dev.sh` survives tool-call boundaries (bare nohup bun run dev gets reaped).
+- Retook 5 README screenshots (home, home-dark, chat with live streamed reply, image studio, iPhone 14 mobile) with fresh branding.
+- README.md: full Persian docs (badges, screenshots, features, 10-provider table, APK download, dev quickstart, CAP_SERVER_URL + signing secrets tables, architecture ASCII, structure tree, roadmap, FAQ). LICENSE: MIT. Repo topics (ai, android, persian, ...) + homepage set via API.
+- Pushed main -> run#5 SUCCESS. Downloaded artifact and VERIFIED inside APK: mipmap-xxxhdpi ic_launcher.png + adaptive foreground/background are the new sparkle brand.
+- Tagged v1.0.1 -> run#6 SUCCESS -> Release published.
+
+Stage Summary:
+- Live: https://github.com/mctarh-eng/hooshyar/releases/download/v1.0.1/hooshyar-debug.apk (4.9MB, correct branded launcher icon incl. adaptive layers).
+- Icon pipeline now reproducible: bun scripts/make-icons.ts && bunx capacitor-assets generate --android.
